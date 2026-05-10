@@ -7,6 +7,13 @@ local function get_cwd()
   return vim.fn.getcwd()
 end
 
+local function ensure_trailing_slash(path)
+  if string.match(path, "/$") then
+    return path
+  end
+  return path .. "/"
+end
+
 -- List remote files and folders using ssh
 local function list_remote_items(sftp_config)
   local cmd = "ssh "
@@ -75,6 +82,7 @@ function M.download_file()
     end
     
     local cwd = get_cwd()
+    local cwd_with_slash = ensure_trailing_slash(cwd)
     
     -- Calculate relative path from remote_path to maintain directory structure
     local relative_path = choice.path
@@ -89,10 +97,10 @@ function M.download_file()
     if choice.is_dir then
       -- For directories, we want to create the directory structure and download its contents
       -- The path should include the directory name itself
-      local_path = cwd .. "/" .. relative_path
+      local_path = cwd_with_slash .. relative_path
     else
       -- For files, create the full path including parent directories
-      local_path = cwd .. "/" .. relative_path
+      local_path = cwd_with_slash .. relative_path
     end
     
     -- Create parent directories if they don't exist
@@ -127,7 +135,7 @@ function M.download_file()
         -- Make sure the parent directory exists
         vim.fn.mkdir(parent_dir, "p")
       else
-        local_target = cwd .. "/"
+         local_target = cwd_with_slash
       end
       
       -- Remove existing directory to ensure fresh download (overwrite)

@@ -7,6 +7,28 @@ local function get_cwd()
   return vim.fn.getcwd()
 end
 
+local function ensure_trailing_slash(path)
+  if string.match(path, "/$") then
+    return path
+  end
+  return path .. "/"
+end
+
+local function join_paths(base, relative)
+  return ensure_trailing_slash(base) .. relative
+end
+
+local function relative_to_cwd(absolute_path)
+  local cwd_prefix = ensure_trailing_slash(get_cwd())
+  local relative_path = string.gsub(absolute_path, "^" .. vim.pesc(cwd_prefix), "", 1)
+
+  if relative_path == absolute_path then
+    return nil
+  end
+
+  return relative_path
+end
+
 -- Build SCP command for upload
 local function build_scp_command(config, local_file, remote_file, is_directory)
   local cmd = "scp"
@@ -64,15 +86,13 @@ function M.upload_file()
   end
   
   -- Calculate relative path from cwd
-  local cwd = get_cwd()
-  local relative_path = string.gsub(current_file, "^" .. cwd .. "/", "")
+  local relative_path = relative_to_cwd(current_file)
+  if not relative_path then
+    relative_path = vim.fn.fnamemodify(current_file, ":t")
+  end
   
   -- Build remote path
-  local remote_file = sftp_config.remote_path
-  if not string.match(remote_file, "/$") then
-    remote_file = remote_file .. "/"
-  end
-  remote_file = remote_file .. relative_path
+  local remote_file = join_paths(sftp_config.remote_path, relative_path)
   
   -- Build and execute command
   local cmd = build_scp_command(sftp_config, current_file, remote_file, false)
@@ -195,31 +215,23 @@ function M.upload_directory()
       return -- User cancelled
     end
     
-    local cwd = get_cwd()
     local relative_path = choice.name
     
     -- Build remote path - for directories we want to upload to the parent and let SCP create the directory
     local remote_target
     if choice.is_dir then
       -- For directories, upload to remote_path and let SCP create the directory
-      remote_target = sftp_config.remote_path
-      if not string.match(remote_target, "/$") then
-        remote_target = remote_target .. "/"
-      end
+      remote_target = ensure_trailing_slash(sftp_config.remote_path)
       
       -- Check if remote directory exists and get confirmation
-      local remote_dir_path = remote_target .. choice.name
+      local remote_dir_path = join_paths(sftp_config.remote_path, choice.name)
       if not check_remote_and_confirm(sftp_config, remote_dir_path, choice.name, true) then
         vim.notify("Upload cancelled by user", vim.log.levels.INFO)
         return
       end
     else
       -- For files, build full remote path
-      remote_target = sftp_config.remote_path
-      if not string.match(remote_target, "/$") then
-        remote_target = remote_target .. "/"
-      end
-      remote_target = remote_target .. relative_path
+      remote_target = join_paths(sftp_config.remote_path, relative_path)
       
       -- Check if remote file exists and get confirmation
       if not check_remote_and_confirm(sftp_config, remote_target, choice.name, false) then
