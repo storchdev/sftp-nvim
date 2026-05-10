@@ -94,7 +94,7 @@ function M.upload_file()
 end
 
 -- List local directories and files in current working directory
-local function list_local_items()
+local function list_local_items(show_hidden)
   local cwd = get_cwd()
   local items = {}
   
@@ -105,8 +105,9 @@ local function list_local_items()
     local item_name = vim.fn.fnamemodify(item_path, ":t")
     local is_dir = vim.fn.isdirectory(item_path) == 1
     
-    -- Skip hidden files and .sftp-config.json
-    if not item_name:match("^%.") and item_name ~= ".sftp-config.json" then
+    local is_hidden = item_name:match("^%.") ~= nil
+
+    if (show_hidden or not is_hidden) and item_name ~= ".sftp-config.json" then
       local display_name = (is_dir and "📁 " or "📄 ") .. item_name
       table.insert(items, {
         path = item_path,
@@ -126,6 +127,75 @@ local function list_local_items()
   end)
   
   return items
+end
+
+local function select_upload_item(show_hidden, on_choice)
+  local ok_telescope = pcall(require, "telescope")
+  if not ok_telescope then
+    local items = list_local_items(show_hidden)
+    if not items or #items == 0 then
+      vim.notify("No files or directories found in current directory.", vim.log.levels.ERROR)
+      return
+    end
+
+    vim.ui.select(items, {
+      prompt = "Select file or directory to upload:",
+      format_item = function(item)
+        return item.display
+      end
+    }, on_choice)
+    return
+  end
+
+  local pickers = require("telescope.pickers")
+  local finders = require("telescope.finders")
+  local conf = require("telescope.config").values
+  local actions = require("telescope.actions")
+  local action_state = require("telescope.actions.state")
+
+  local function open_picker(hidden)
+    local items = list_local_items(hidden)
+    if not items or #items == 0 then
+      vim.notify("No files or directories found in current directory.", vim.log.levels.ERROR)
+      return
+    end
+
+    pickers.new({}, {
+      prompt_title = "Upload (Alt-h: toggle hidden " .. (hidden and "on" or "off") .. ")",
+      finder = finders.new_table({
+        results = items,
+        entry_maker = function(item)
+          return {
+            value = item,
+            display = item.display,
+            ordinal = item.name,
+          }
+        end,
+      }),
+      sorter = conf.generic_sorter({}),
+      attach_mappings = function(prompt_bufnr, map)
+        local function toggle_hidden()
+          actions.close(prompt_bufnr)
+          vim.schedule(function()
+            open_picker(not hidden)
+          end)
+        end
+
+        map("i", "<A-h>", toggle_hidden)
+        map("n", "<A-h>", toggle_hidden)
+
+        actions.select_default:replace(function()
+          local selection = action_state.get_selected_entry()
+          actions.close(prompt_bufnr)
+          on_choice(selection and selection.value or nil)
+        end)
+
+        return true
+      end,
+    }):find()
+  end
+
+  open_picker(show_hidden)
 end
 
 -- Check if remote directory exists and get confirmation for overwrite
@@ -181,19 +251,7 @@ function M.upload_directory()
     return
   end
   
-  local items = list_local_items()
-  if not items or #items == 0 then
-    vim.notify("No files or directories found in current directory.", vim.log.levels.ERROR)
-    return
-  end
-  
-  -- Use vim.ui.select for better UX
-  vim.ui.select(items, {
-    prompt = "Select file or directory to upload:",
-    format_item = function(item)
-      return item.display
-    end
-  }, function(choice)
+  select_upload_item(false, function(choice)
     if not choice then
       return -- User cancelled
     end

@@ -113,8 +113,9 @@ If you upload a file that is outside your current Neovim working directory, the 
 **Upload Files/Directories:**
 3. Run `:SftpUploadDir` or press `<leader>fU`
 4. Select from the list of local files and directories:
-   - 📁 Directories are listed first
-   - 📄 Files are listed after directories
+    - 📁 Directories are listed first
+    - 📄 Files are listed after directories
+    - Press `<A-h>` to toggle hidden files on/off in the picker
 5. If the remote file/directory exists, you'll get a confirmation dialog
 6. The entire directory structure will be preserved and uploaded recursively
 
