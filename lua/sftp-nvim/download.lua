@@ -1,17 +1,11 @@
 local M = {}
 
 local config = require('sftp-nvim.config')
+local path = require('sftp-nvim.path')
 
 -- Get the current working directory
 local function get_cwd()
   return vim.fn.getcwd()
-end
-
-local function ensure_trailing_slash(path)
-  if string.match(path, "/$") then
-    return path
-  end
-  return path .. "/"
 end
 
 -- List remote files and folders using ssh
@@ -82,7 +76,7 @@ function M.download_file()
     end
     
     local cwd = get_cwd()
-    local cwd_with_slash = ensure_trailing_slash(cwd)
+    local cwd_with_slash = path.ensure_trailing_slash(cwd)
     
     -- Calculate relative path from remote_path to maintain directory structure
     local relative_path = choice.path

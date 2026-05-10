@@ -83,6 +83,23 @@ The plugin creates a `.sftp-config.json` file in your project root with the foll
 }
 ```
 
+### Path Mapping Behavior
+
+All transfer commands use path mapping relative to your current Neovim working directory (`:pwd`):
+
+- Local project root (cwd): `/home/user/Local`
+- Remote base (`remote_path`): `/home/user/Remote`
+- Local file: `/home/user/Local/utils/file.txt`
+- Remote target: `/home/user/Remote/utils/file.txt`
+
+This same mapping rule is used consistently for:
+
+- `:SftpUpload` (upload current file)
+- `:SftpUploadDir` (upload selected file/directory)
+- `:SftpDownload` (download selected file/directory)
+
+If you upload a file that is outside your current Neovim working directory, the plugin uploads it to `remote_path/<filename>` to avoid unexpected absolute-path mirroring on the remote host.
+
 ### Workflow
 
 #### Upload Workflow
@@ -127,6 +144,7 @@ The plugin is organized in a modular structure:
 lua/sftp-nvim/
 ├── init.lua        # Main entry point and command registration
 ├── config.lua      # Configuration management
+├── path.lua        # Shared path mapping helpers
 ├── upload.lua      # File upload functionality  
 └── download.lua    # File/folder download and browsing
 ```
@@ -176,7 +194,7 @@ your-project/
 
 **Upload**: When uploading `src/main.js`, it will be uploaded to `remote_path/src/main.js` on the server.
 
-**Download**: When downloading from remote, files and folders are downloaded to your current working directory maintaining their names.
+**Download**: When downloading from remote, files and folders are downloaded into your current working directory while preserving their path relative to `remote_path`.
 
 ## Recent Updates
 
